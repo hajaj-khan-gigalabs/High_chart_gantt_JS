@@ -1,0 +1,441 @@
+<script src="https://code.highcharts.com/gantt/highcharts-gantt.js"></script>
+<script src="https://code.highcharts.com/gantt/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/gantt/modules/draggable-points.js"></script>
+<link rel="stylesheet" href="custom.css" />
+
+<div id="container"></div>
+<script>
+  (async () => {
+    var data;
+    function readTextFile(file, callback) {
+      var rawFile = new XMLHttpRequest();
+      rawFile.overrideMimeType("application/json");
+      rawFile.open("GET", file, true);
+      rawFile.onreadystatechange = function () {
+        if (rawFile.readyState === 4 && rawFile.status == "200") {
+          data = JSON.parse(rawFile.responseText);
+        }
+      };
+      rawFile.send(null);
+    }
+    readTextFile("./data.json", function (text) {
+      data = JSON.parse(text);
+    });
+
+    var today = new Date(),
+      day = 1000 * 60 * 60 * 24,
+      // Utility functions
+      dateFormat = Highcharts.dateFormat,
+      defined = Highcharts.defined,
+      isObject = Highcharts.isObject;
+
+    // Set to 00:00:00:000 today
+    today.setUTCHours(0);
+    today.setUTCMinutes(0);
+    today.setUTCSeconds(0);
+    today.setUTCMilliseconds(0);
+    today = today.getTime();
+    var line = "";
+    var d;
+
+    var chart = Highcharts.ganttChart(
+      "container",
+      {
+        rangeSelector: {
+          enabled: true,
+          buttonPosition: {
+            align: "right",
+            x: 0,
+            y: 0,
+          },
+          dropdown: "never",
+          inputEnabled: false,
+        },
+        chart: {
+          spacingLeft: 1,
+          zoomType: "x",
+          panning: true,
+          panKey: "shift",
+          backgroundColor: "white",
+          events: {
+            load: function () {
+              // Draw the flow chart
+            },
+          },
+        },
+
+        title: {
+          text: "Gantt Project Management",
+        },
+        subtitle: {
+          text: "Drag and drop points to edit",
+        },
+        plotOptions: {
+          series: {
+            animation: false, // Do not animate dependency connectors
+            dragDrop: {
+              draggableX: true,
+              draggableY: true,
+              //   dragMinY: 0,
+              //   dragMaxY: 2,
+              dragPrecisionX: day / 3, // Snap to eight hours
+              liveRedraw: false,
+            },
+            dataLabels: {
+              enabled: true,
+              format: "{point.name}",
+              style: {
+                cursor: "default",
+                pointerEvents: "none",
+              },
+            },
+            allowPointSelect: true,
+            point: {
+              events: {
+                // select: function (event) {
+                //   console.log("select", event);
+                //   chart.renderer
+                //     .image(
+                //       "https://www.highcharts.com/samples/graphics/sun.png",
+                //       event.target.plotX,
+                //       event.target.plotY,
+                //       // 733,
+                //       // 175,
+                //       20,
+                //       20
+                //     )
+                //     .add()
+                //     .on("click", function () {
+                //       console.log("click:" + this);
+                //     });
+                // },
+                // unselect: function (event) {
+                //   console.log("unselect", event);
+                // },
+                drag: function (data) {
+                  var ren = chart.renderer;
+                  // Separator, client from service
+                  if (line == "") {
+                    line = ren
+                      .path([
+                        "M",
+                        data.chartX,
+                        data.chartY,
+                        "L",
+                        data.chartX,
+                        850,
+                      ])
+                      .attr({
+                        "stroke-width": 2,
+                        stroke: "silver",
+                        dashstyle: "dash",
+                      })
+                      .add();
+                  } else {
+                    d = line.d.split(" ");
+                    d[1] = data.chartX;
+                    d[2] = data.chartY;
+                    d[4] = data.chartX;
+                    line.animate(
+                      {
+                        d: d,
+                      },
+                      500
+                    );
+                  }
+                },
+                drop: function (data) {
+                  line.destroy();
+                  line = "";
+                },
+              },
+            },
+          },
+        },
+        accessibility: {
+          enabled: true,
+          keyboardNavigation: {
+            seriesNavigation: "serialize",
+          },
+        },
+        xAxis: {
+          currentDateIndicator: true,
+        },
+        yAxis: {},
+        series: [
+          {
+            //   events:{
+            //   click : function(event){
+            //     console.log(',,,,,,,,,,,,,,,,,,,,,,',event.point)
+            //   }
+            // },
+            name: "Offices",
+            data: [
+              {
+                name: "New offices",
+                id: "new_offices",
+                owner: "Peter",
+              },
+              {
+                name: "Prepare office building",
+                id: "prepare_building",
+                parent: "new_offices",
+                start: today - 2 * day,
+                end: today + 6 * day,
+                completed: {
+                  amount: 0.2,
+                },
+                custom: {
+                  critical: false,
+                },
+                owner: "Linda",
+              },
+              {
+                name: "Inspect building",
+                id: "inspect_building",
+                dependency: "prepare_building",
+                parent: "new_offices",
+                start: today + 6 * day,
+                end: today + 8 * day,
+                custom: {
+                  critical: false,
+                },
+                owner: "Ivy",
+              },
+              {
+                name: "Passed inspection",
+                id: "passed_inspection",
+                dependency: "inspect_building",
+                parent: "new_offices",
+                start: today + 9.5 * day,
+                milestone: true,
+                custom: {
+                  critical: false,
+                },
+                owner: "Peter",
+              },
+              {
+                name: "Relocate",
+                id: "relocate",
+                dependency: "passed_inspection",
+                owner: "Josh",
+              },
+              {
+                name: "Relocate staff",
+                id: "relocate_staff",
+                parent: "relocate",
+                start: today + 10 * day,
+                end: today + 11 * day,
+                custom: {
+                  critical: true,
+                },
+                owner: "Mark",
+              },
+              {
+                name: "Relocate test facility",
+                dependency: "relocate_staff",
+                parent: "relocate",
+                start: today + 11 * day,
+                end: today + 13 * day,
+                custom: {
+                  critical: false,
+                },
+                owner: "Anne",
+              },
+              {
+                name: "Relocate cantina",
+                dependency: "relocate_staff",
+                parent: "relocate",
+                start: today + 11 * day,
+                end: today + 14 * day,
+                custom: {
+                  critical: false,
+                },
+              },
+            ],
+          },
+          {
+            name: "Product",
+            data: [
+              {
+                name: "New product launch",
+                id: "new_product",
+                owner: "Peter",
+              },
+              {
+                name: "Development",
+                id: "development",
+                parent: "new_product",
+                start: today - day,
+                end: today + 11 * day,
+                completed: {
+                  amount: 0.6,
+                  fill: "#e80",
+                },
+                owner: "Susan",
+              },
+              {
+                name: "Beta",
+                id: "beta",
+                dependency: "development",
+                parent: "new_product",
+                start: today + 12.5 * day,
+                milestone: true,
+                owner: "Peter",
+              },
+              {
+                name: "Final development",
+                id: "finalize",
+                dependency: "beta",
+                parent: "new_product",
+                start: today + 13 * day,
+                end: today + 17 * day,
+              },
+              {
+                name: "Launch",
+                dependency: "finalize",
+                parent: "new_product",
+                start: today + 17.5 * day,
+                milestone: true,
+                owner: "Peter",
+              },
+            ],
+          },
+        ],
+        // tooltip: {
+        //   pointFormatter: function () {
+        //     var point = this,
+        //       format = "%e. %b",
+        //       options = point.options,
+        //       completed = options.completed,
+        //       amount = isObject(completed) ? completed.amount : completed,
+        //       status = (amount || 0) * 100 + "%",
+        //       lines;
+
+        //     lines = [
+        //       {
+        //         value: point.name,
+        //         style: "font-weight: bold;",
+        //       },
+        //       {
+        //         title: "Start",
+        //         value: dateFormat(format, point.start),
+        //       },
+        //       {
+        //         visible: !options.milestone,
+        //         title: "End",
+        //         value: dateFormat(format, point.end),
+        //       },
+        //       {
+        //         title: "Completed",
+        //         value: status,
+        //       },
+        //       {
+        //         title: "Owner",
+        //         value: options.owner || "unassigned",
+        //       },
+        //     ];
+
+        //     return lines.reduce(function (str, line) {
+        //       var s = "",
+        //         style = defined(line.style) ? line.style : "font-size: 0.8em;";
+        //       if (line.visible !== false) {
+        //         s =
+        //           '<span style="' +
+        //           style +
+        //           '">' +
+        //           (defined(line.title) ? line.title + ": " : "") +
+        //           (defined(line.value) ? line.value : "") +
+        //           "</span><br/>";
+        //       }
+        //       return str + s;
+        //     }, "");
+        //   },
+        // },
+
+        mapNavigation: {
+          enableMouseWheelZoom: true,
+        },
+      },
+      function (chartt) {
+        // on complete
+        var points = chartt.series,
+          width = 20,
+          height = 20;
+
+        points.forEach(function (rec) {
+          rec.points.forEach(function (point) {
+            chartt.renderer
+              .image(
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Sunflower_from_Silesia2.jpg/800px-Sunflower_from_Silesia2.jpg",
+                point.plotX + chartt.plotLeft,
+                point.plotY + chartt.plotTop - height / 2,
+                width,
+                height
+                // function (event) {
+                //   console.log(event);
+                // }
+              )
+              .attr({
+                zIndex: 50,
+              })
+              .add()
+              .on("click", function (event) {
+                console.log(event);
+              });
+          });
+        });
+      }
+    );
+    function KeyPress(e) {
+      var evtobj = window.event ? event : e;
+      if (evtobj.keyCode == 90 && evtobj.ctrlKey) {
+        chart.series[0].addPoint({
+          name: "NewTask",
+          id: "NewTaskt",
+          owner: "Peter",
+          parent: "new_product",
+          start: today + 13 * day,
+          end: today + 17 * day,
+        });
+        chart.redraw();
+      }
+    }
+    let zoomRatio = 0.1;
+    let setZoom = function () {
+      let xMin = chart.xAxis[0].getExtremes().dataMin;
+      let xMax = chart.xAxis[0].getExtremes().dataMax;
+      console.log("xMin: ", xMin);
+      console.log("xMax: ", xMin);
+      // let yMin = chart.yAxis[0].getExtremes().dataMin;
+      // let yMax = chart.yAxis[0].getExtremes().dataMax;
+
+      chart.xAxis[0].setExtremes(
+        xMin + (1 - zoomRatio) * xMax,
+        xMax * zoomRatio
+      );
+      // chart.yAxis[0].setExtremes(yMin + (1 - zoomRatio) * yMax, yMax * zoomRatio);
+    };
+    // setZoom();
+    document
+      .getElementById("container")
+      .addEventListener("mousewheel", function (event) {
+        if (event.ctrlKey == true) {
+          event.preventDefault();
+          if (event.deltaY < 0) {
+            if (zoomRatio > 0.08) {
+              console.log("zoomIn: ", zoomRatio);
+              zoomRatio = zoomRatio - 0.01;
+              setZoom();
+            }
+          } else if (event.deltaY > 0) {
+            console.log("zoomOut: ", event);
+            zoomRatio = zoomRatio + 0.01;
+            setZoom();
+          }
+        }
+      });
+
+    document.onkeydown = KeyPress;
+  })();
+</script>
